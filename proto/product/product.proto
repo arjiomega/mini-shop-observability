@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package product;
+
+option go_package = "mini-shop/proto/productpb";
+
+service ProductService {
+  rpc GetProduct(GetProductRequest) returns (GetProductResponse);
+  rpc CreateProduct(CreateProductRequest) returns (CreateProductResponse);
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse);
+}
+
+message GetProductRequest {
+  int64 id = 1;
+}
+
+message CreateProductRequest {
+  string name = 1;
+}
+
+message ListProductsRequest {}
+
+message Product {
+  int64 id = 1;
+  string name = 2;
+}
+
+message ListProductsResponse {
+  repeated Product products = 1;
+}
+
+message GetProductResponse {
+  int64 id = 1;
+  string name = 2;
+}
+
+message CreateProductResponse {
+  int64 id = 1;
+  string name = 2;
+}
