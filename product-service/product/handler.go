@@ -3,7 +3,9 @@ package product
 import (
 	"context"
 	"errors"
+	"log"
 	productpb "mini-shop/proto/productpb"
+	"os"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -43,7 +45,12 @@ func (h *Handler) GetProduct(
 	req *productpb.GetProductRequest,
 ) (*productpb.GetProductResponse, error) {
 
-	product, err := h.service.GetByID(int(req.Id))
+	log.Printf(
+		"GetProduct handled by %s",
+		os.Getenv("SERVICE_ID"),
+	)
+
+	product, err := h.service.GetByID(ctx, int(req.Id))
 	if err != nil {
 		if errors.Is(err, ErrProductNotFound) {
 			return nil, status.Error(
@@ -51,6 +58,8 @@ func (h *Handler) GetProduct(
 				"product not found",
 			)
 		}
+
+		log.Printf("GetProduct failed: %v", err)
 
 		return nil, status.Error(
 			codes.Internal,

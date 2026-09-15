@@ -1,6 +1,7 @@
 package product
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 )
@@ -35,10 +36,11 @@ func (r *Repository) Create(input ProductCreate) (Product, error) {
 	return product, nil
 }
 
-func (r *Repository) GetByID(id int) (Product, error) {
+func (r *Repository) GetByID(ctx context.Context, id int) (Product, error) {
 	var product Product
 
-	err := r.db.QueryRow(
+	err := r.db.QueryRowContext(
+		ctx,
 		`SELECT id, name
 				FROM products
 				WHERE id = $1`,

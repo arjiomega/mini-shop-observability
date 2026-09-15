@@ -32,10 +32,15 @@ func main() {
 
 	defer db.Close()
 
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		log.Fatal("REDIS_ADDR is required")
+	}
+
+	cache := product.NewRedisCache(redisAddr)
+
 	repository := product.NewRepository(db)
-
-	service := product.NewService(repository)
-
+	service := product.NewService(repository, cache)
 	handler := product.NewHandler(service)
 
 	grpcServer := grpc.NewServer()
@@ -50,14 +55,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	serviceID := os.Getenv("SERVICE_ID")
-	if serviceID == "" {
-		log.Fatal("SERVICE_ID is required")
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Fatal(err)
 	}
-	serviceAddress := os.Getenv("SERVICE_ADDRESS")
-	if serviceAddress == "" {
-		log.Fatal("SERVICE_ADDRESS is required")
-	}
+
+	serviceID := hostname
+	serviceAddress := hostname
 
 	_, err = consul.RegisterService(
 		"consul:8500",
