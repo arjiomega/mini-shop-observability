@@ -4,30 +4,37 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"mini-shop/gateway/api"
+	"mini-shop/gateway/consul"
 	"mini-shop/gateway/product"
-	productpb "mini-shop/proto/productpb"
 
 	_ "modernc.org/sqlite"
 )
 
 func main() {
-	conn, err := grpc.NewClient(
-		"localhost:50051",
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	consulClient, err := consul.NewClient("consul:8500")
+	if err != nil {
+		log.Fatal(err)
+	}
+	productServiceAddresses, err := consulClient.GetServiceAddresses(
+		"product-service",
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer conn.Close()
 
-	grpcClient := productpb.NewProductServiceClient(conn)
+	log.Printf(
+		"discovered product-service instances: %v",
+		productServiceAddresses,
+	)
 
-	// Create gateway product client.
-	productClient := product.NewClient(grpcClient)
+	productClient, err := product.NewLoadBalancer(
+		productServiceAddresses,
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Create HTTP handler.
 	productHandler := product.NewHandler(productClient)

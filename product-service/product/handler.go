@@ -2,7 +2,11 @@ package product
 
 import (
 	"context"
+	"errors"
 	productpb "mini-shop/proto/productpb"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type Handler struct {
@@ -41,7 +45,17 @@ func (h *Handler) GetProduct(
 
 	product, err := h.service.GetByID(int(req.Id))
 	if err != nil {
-		return nil, err
+		if errors.Is(err, ErrProductNotFound) {
+			return nil, status.Error(
+				codes.NotFound,
+				"product not found",
+			)
+		}
+
+		return nil, status.Error(
+			codes.Internal,
+			"failed to get product",
+		)
 	}
 
 	return &productpb.GetProductResponse{

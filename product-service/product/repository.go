@@ -16,31 +16,32 @@ func NewRepository(db *sql.DB) *Repository {
 }
 
 func (r *Repository) Create(input ProductCreate) (Product, error) {
-	result, err := r.db.Exec(
-		"INSERT INTO products (name) VALUES (?)",
+	var product Product
+
+	err := r.db.QueryRow(
+		`INSERT INTO products (name)
+		 VALUES ($1)
+		 RETURNING id, name`,
 		input.Name,
+	).Scan(
+		&product.ID,
+		&product.Name,
 	)
-	if err != nil {
-		return Product{}, err
-	}
-
-	id, err := result.LastInsertId()
 
 	if err != nil {
 		return Product{}, err
 	}
 
-	return Product{
-		ID:   int(id),
-		Name: input.Name,
-	}, nil
+	return product, nil
 }
 
 func (r *Repository) GetByID(id int) (Product, error) {
 	var product Product
 
 	err := r.db.QueryRow(
-		"SELECT id, name FROM products WHERE id = ?",
+		`SELECT id, name
+				FROM products
+				WHERE id = $1`,
 		id,
 	).Scan(
 		&product.ID,
@@ -59,9 +60,9 @@ func (r *Repository) GetByID(id int) (Product, error) {
 }
 
 func (r *Repository) List() ([]Product, error) {
-
 	rows, err := r.db.Query(
-		"SELECT id, name FROM products",
+		`SELECT id, name
+		 FROM products`,
 	)
 	if err != nil {
 		return nil, err
@@ -79,6 +80,7 @@ func (r *Repository) List() ([]Product, error) {
 		); err != nil {
 			return nil, err
 		}
+
 		products = append(products, product)
 	}
 
@@ -87,5 +89,4 @@ func (r *Repository) List() ([]Product, error) {
 	}
 
 	return products, nil
-
 }

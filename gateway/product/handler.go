@@ -1,18 +1,21 @@
 package product
 
 import (
+	"log"
 	"net/http"
 
 	"mini-shop/gateway/api"
 
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type Handler struct {
-	client *Client
+	client ProductClient
 }
 
-func NewHandler(client *Client) *Handler {
+func NewHandler(client ProductClient) *Handler {
 	return &Handler{
 		client: client,
 	}
@@ -27,6 +30,15 @@ func (h *Handler) GetProduct(
 		int64(productId),
 	)
 	if err != nil {
+		log.Printf("GetProduct gRPC error: %v", err)
+
+		if status.Code(err) == codes.NotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "product not found",
+			})
+			return
+		}
+
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "product service unavailable",
 		})

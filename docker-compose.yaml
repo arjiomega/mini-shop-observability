@@ -1,0 +1,99 @@
+services:
+  consul:
+    image: hashicorp/consul:latest
+    container_name: consul
+    ports:
+      - "8500:8500"
+      - "8600:8600/udp"
+    command: agent -server -bootstrap-expect=1 -ui -client=0.0.0.0
+
+  product-service-1:
+    build:
+      context: .
+      dockerfile: product-service/Dockerfile
+    container_name: product-service-1
+    depends_on:
+      consul:
+        condition: service_started
+      product-migrations:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://product_user:product_password@postgres:5432/product_db?sslmode=disable
+      SERVICE_ID: product-service-1
+      SERVICE_ADDRESS: product-service-1
+    cpus: 0.25
+    mem_limit: 128m
+
+  product-service-2:
+    build:
+      context: .
+      dockerfile: product-service/Dockerfile
+    container_name: product-service-2
+    depends_on:
+      consul:
+        condition: service_started
+      product-migrations:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://product_user:product_password@postgres:5432/product_db?sslmode=disable
+      SERVICE_ID: product-service-2
+      SERVICE_ADDRESS: product-service-2
+    cpus: 0.25
+    mem_limit: 128m
+
+  product-service-3:
+    build:
+      context: .
+      dockerfile: product-service/Dockerfile
+    container_name: product-service-3
+    depends_on:
+      consul:
+        condition: service_started
+      product-migrations:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://product_user:product_password@postgres:5432/product_db?sslmode=disable
+      SERVICE_ID: product-service-3
+      SERVICE_ADDRESS: product-service-3
+    cpus: 0.25
+    mem_limit: 128m
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    container_name: gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - consul
+
+  postgres:
+    image: postgres:18
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  product-migrations:
+    build:
+      context: ./migrations/product
+      dockerfile: Dockerfile
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
