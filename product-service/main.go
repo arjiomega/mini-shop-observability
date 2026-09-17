@@ -7,6 +7,8 @@ import (
 	"os"
 
 	"google.golang.org/grpc"
+	health "google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
@@ -48,6 +50,18 @@ func main() {
 	productpb.RegisterProductServiceServer(
 		grpcServer,
 		handler,
+	)
+
+	healthServer := health.NewServer()
+
+	healthpb.RegisterHealthServer(
+		grpcServer,
+		healthServer,
+	)
+
+	healthServer.SetServingStatus(
+		"",
+		healthpb.HealthCheckResponse_SERVING,
 	)
 
 	listener, err := net.Listen("tcp", ":50051")

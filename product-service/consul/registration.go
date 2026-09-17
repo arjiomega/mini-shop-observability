@@ -1,6 +1,8 @@
 package consul
 
 import (
+	"fmt"
+
 	"github.com/hashicorp/consul/api"
 )
 
@@ -25,6 +27,11 @@ func RegisterService(
 		Name:    serviceName,
 		Address: address,
 		Port:    port,
+		Check: &api.AgentServiceCheck{
+			GRPC: fmt.Sprintf("%s:%d", address, port), Interval: "5s",
+			Timeout:                        "2s",
+			DeregisterCriticalServiceAfter: "30s",
+		},
 	}
 
 	err = client.Agent().ServiceRegister(registration)
