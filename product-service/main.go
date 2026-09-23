@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"net"
 	"os"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	health "google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
@@ -16,9 +18,30 @@ import (
 
 	"mini-shop/product-service/consul"
 	"mini-shop/product-service/product"
+	"mini-shop/product-service/tracing"
 )
 
 func main() {
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	serviceID := hostname
+	serviceAddress := hostname
+
+	ctx := context.Background()
+
+	shutdownTracing, err := tracing.Init(ctx, "product-service", hostname)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		if err := shutdownTracing(ctx); err != nil {
+			log.Printf("failed to shutdown tracing: %v", err)
+		}
+	}()
+
 	db, err := sql.Open(
 		"pgx",
 		os.Getenv("DATABASE_URL"),
@@ -45,7 +68,9 @@ func main() {
 	service := product.NewService(repository, cache)
 	handler := product.NewHandler(service)
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+	)
 
 	productpb.RegisterProductServiceServer(
 		grpcServer,
@@ -68,14 +93,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	hostname, err := os.Hostname()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	serviceID := hostname
-	serviceAddress := hostname
 
 	_, err = consul.RegisterService(
 		"consul:8500",

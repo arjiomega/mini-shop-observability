@@ -1,10 +1,11 @@
 package product
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 
 	"mini-shop/gateway/api"
+	"mini-shop/gateway/logging"
 
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc/codes"
@@ -13,11 +14,13 @@ import (
 
 type Handler struct {
 	client ProductClient
+	logger *logging.Logger
 }
 
-func NewHandler(client ProductClient) *Handler {
+func NewHandler(client ProductClient, logger *logging.Logger) *Handler {
 	return &Handler{
 		client: client,
+		logger: logger,
 	}
 }
 
@@ -30,7 +33,12 @@ func (h *Handler) GetProduct(
 		int64(productId),
 	)
 	if err != nil {
-		log.Printf("GetProduct gRPC error: %v", err)
+		h.logger.Error(
+			c.Request.Context(),
+			"failed to get product",
+			slog.Int("product_id", productId),
+			slog.Any("error", err),
+		)
 
 		if status.Code(err) == codes.NotFound {
 			c.JSON(http.StatusNotFound, gin.H{
@@ -52,6 +60,12 @@ func (h *Handler) CreateProduct(c *gin.Context) {
 	var request api.CreateProductRequest
 
 	if err := c.ShouldBindJSON(&request); err != nil {
+		h.logger.Warn(
+			c.Request.Context(),
+			"invalid create product request",
+			slog.Any("error", err),
+		)
+
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "invalid request",
 		})
@@ -63,6 +77,13 @@ func (h *Handler) CreateProduct(c *gin.Context) {
 		request.Name,
 	)
 	if err != nil {
+		h.logger.Error(
+			c.Request.Context(),
+			"failed to create product",
+			slog.String("product_name", request.Name),
+			slog.Any("error", err),
+		)
+
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "product service unavailable",
 		})
