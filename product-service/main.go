@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"net"
 	"os"
@@ -12,6 +11,7 @@ import (
 	health "google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 
+	"github.com/XSAM/otelsql"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	productpb "mini-shop/proto/productpb"
@@ -21,10 +21,10 @@ import (
 	"mini-shop/product-service/tracing"
 )
 
-func main() {
+func run() error {
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	serviceID := hostname
@@ -34,7 +34,7 @@ func main() {
 
 	shutdownTracing, err := tracing.Init(ctx, "product-service", hostname)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer func() {
 		if err := shutdownTracing(ctx); err != nil {
@@ -42,15 +42,20 @@ func main() {
 		}
 	}()
 
-	db, err := sql.Open(
+	db, err := otelsql.Open(
 		"pgx",
 		os.Getenv("DATABASE_URL"),
 	)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+
+	if _, err := otelsql.RegisterDBStatsMetrics(db); err != nil {
+		return err
+	}
+
 	if err := db.Ping(); err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	log.Println("connected to PostgreSQL")
@@ -62,7 +67,10 @@ func main() {
 		log.Fatal("REDIS_ADDR is required")
 	}
 
-	cache := product.NewRedisCache(redisAddr)
+	cache, err := product.NewRedisCache(redisAddr)
+	if err != nil {
+		return err
+	}
 
 	repository := product.NewRepository(db)
 	service := product.NewService(repository, cache)
@@ -91,7 +99,7 @@ func main() {
 
 	listener, err := net.Listen("tcp", ":50051")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	_, err = consul.RegisterService(
@@ -102,13 +110,17 @@ func main() {
 		50051,
 	)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	log.Println("product service registered with Consul")
 	log.Println("product service listening on :50051")
 
-	if err := grpcServer.Serve(listener); err != nil {
+	return grpcServer.Serve(listener)
+}
+
+func main() {
+	if err := run(); err != nil {
 		log.Fatal(err)
 	}
 }
