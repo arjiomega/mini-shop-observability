@@ -61,11 +61,17 @@ func run() error {
 	}
 
 	var productServiceAddresses []string
+	var lastIndex uint64
 
 	for attempt := 1; attempt <= 30; attempt++ {
-		productServiceAddresses, err = consulClient.GetServiceAddresses("product-service")
+		addresses, index, err := consulClient.GetServiceAddresses(
+			"product-service",
+			0,
+		)
 
 		if err == nil {
+			productServiceAddresses = addresses
+			lastIndex = index
 			break
 		}
 
@@ -78,7 +84,7 @@ func run() error {
 		)
 
 		if attempt == 30 {
-			return fmt.Errorf("product-service never became available")
+			return fmt.Errorf("product-service never became available: %w", err)
 		}
 
 		time.Sleep(2 * time.Second)
@@ -96,6 +102,41 @@ func run() error {
 	if err != nil {
 		return err
 	}
+
+	go func() {
+		for {
+			addresses, index, err := consulClient.GetServiceAddresses(
+				"product-service",
+				lastIndex,
+			)
+			if err != nil {
+				logger.Warn(
+					ctx,
+					"failed to watch product-service",
+					slog.Any("error", err),
+				)
+				time.Sleep(2 * time.Second)
+				continue
+			}
+
+			lastIndex = index
+
+			logger.Info(
+				ctx,
+				"product-service instances changed",
+				slog.Any("instances", addresses),
+			)
+
+			if err := productClient.Update(addresses); err != nil {
+				logger.Error(
+					ctx,
+					"failed to update product-service load balancer",
+					slog.Any("error", err),
+				)
+			}
+
+		}
+	}()
 
 	// Create HTTP handler.
 	productHandler := product.NewHandler(productClient, logger)

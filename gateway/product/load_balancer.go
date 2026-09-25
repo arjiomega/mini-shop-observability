@@ -3,6 +3,7 @@ package product
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 
 	productpb "mini-shop/proto/productpb"
@@ -13,11 +14,35 @@ import (
 )
 
 type LoadBalancer struct {
+	mu      sync.RWMutex
 	clients []*Client
 	counter uint64
 }
 
 func NewLoadBalancer(addresses []string) (*LoadBalancer, error) {
+	lb := &LoadBalancer{}
+
+	if err := lb.Update(addresses); err != nil {
+		return nil, err
+	}
+
+	return lb, nil
+}
+
+func (lb *LoadBalancer) next() *Client {
+	lb.mu.RLock()
+	defer lb.mu.RUnlock()
+
+	if len(lb.clients) == 0 {
+		return nil
+	}
+
+	index := atomic.AddUint64(&lb.counter, 1)
+
+	return lb.clients[(index-1)%uint64(len(lb.clients))]
+}
+
+func (lb *LoadBalancer) Update(addresses []string) error {
 	clients := make([]*Client, 0, len(addresses))
 
 	for _, address := range addresses {
@@ -27,30 +52,30 @@ func NewLoadBalancer(addresses []string) (*LoadBalancer, error) {
 			grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 		)
 		if err != nil {
-			return nil, fmt.Errorf(
-				"connect to %s: %w",
+			return fmt.Errorf(
+				"create connection to %s: %w",
 				address,
 				err,
 			)
 		}
 
-		grpcClient := productpb.NewProductServiceClient(conn)
-
 		clients = append(
 			clients,
-			NewClient(address, grpcClient),
+			NewClient(address, conn),
 		)
 	}
 
-	return &LoadBalancer{
-		clients: clients,
-	}, nil
-}
+	lb.mu.Lock()
+	oldClients := lb.clients
+	lb.clients = clients
+	lb.mu.Unlock()
 
-func (lb *LoadBalancer) next() *Client {
-	index := atomic.AddUint64(&lb.counter, 1)
+	// Close connections that are no longer used.
+	for _, client := range oldClients {
+		_ = client.conn.Close()
+	}
 
-	return lb.clients[(index-1)%uint64(len(lb.clients))]
+	return nil
 }
 
 func (lb *LoadBalancer) GetProduct(

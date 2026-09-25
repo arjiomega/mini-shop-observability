@@ -5,6 +5,8 @@ import (
 	"log"
 
 	productpb "mini-shop/proto/productpb"
+
+	"google.golang.org/grpc"
 )
 
 type ProductClient interface {
@@ -14,21 +16,26 @@ type ProductClient interface {
 }
 
 type Client struct {
-	address    string
-	grpcClient productpb.ProductServiceClient
+	address string
+	client  productpb.ProductServiceClient
+	conn    *grpc.ClientConn
 }
 
-func NewClient(address string, grpcClient productpb.ProductServiceClient) *Client {
+func NewClient(
+	address string,
+	conn *grpc.ClientConn,
+) *Client {
 	return &Client{
-		address:    address,
-		grpcClient: grpcClient,
+		address: address,
+		client:  productpb.NewProductServiceClient(conn),
+		conn:    conn,
 	}
 }
 
 func (c *Client) GetProduct(ctx context.Context, id int64) (*productpb.GetProductResponse, error) {
 	log.Printf("gRPC → %s GetProduct(%d)", c.address, id)
 
-	return c.grpcClient.GetProduct(
+	return c.client.GetProduct(
 		ctx,
 		&productpb.GetProductRequest{Id: id},
 	)
@@ -37,7 +44,7 @@ func (c *Client) GetProduct(ctx context.Context, id int64) (*productpb.GetProduc
 func (c *Client) CreateProduct(ctx context.Context, name string) (*productpb.CreateProductResponse, error) {
 	log.Printf("gRPC → %s CreateProduct(%q)", c.address, name)
 
-	return c.grpcClient.CreateProduct(
+	return c.client.CreateProduct(
 		ctx,
 		&productpb.CreateProductRequest{Name: name},
 	)
@@ -46,7 +53,7 @@ func (c *Client) CreateProduct(ctx context.Context, name string) (*productpb.Cre
 func (c *Client) ListProducts(ctx context.Context) (*productpb.ListProductsResponse, error) {
 	log.Printf("gRPC → %s ListProducts", c.address)
 
-	return c.grpcClient.ListProducts(
+	return c.client.ListProducts(
 		ctx,
 		&productpb.ListProductsRequest{},
 	)
