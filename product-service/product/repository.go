@@ -16,10 +16,11 @@ func NewRepository(db *sql.DB) *Repository {
 	}
 }
 
-func (r *Repository) Create(input ProductCreate) (Product, error) {
+func (r *Repository) Create(ctx context.Context, input ProductCreate) (Product, error) {
 	var product Product
 
-	err := r.db.QueryRow(
+	err := r.db.QueryRowContext(
+		ctx,
 		`INSERT INTO products (name)
 		 VALUES ($1)
 		 RETURNING id, name`,

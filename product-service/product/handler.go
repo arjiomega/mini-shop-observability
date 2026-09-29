@@ -28,7 +28,7 @@ func (h *Handler) CreateProduct(
 	req *productpb.CreateProductRequest,
 ) (*productpb.CreateProductResponse, error) {
 
-	product, err := h.service.Create(ProductCreate{
+	product, err := h.service.Create(ctx, ProductCreate{
 		Name: req.Name,
 	})
 	if err != nil {

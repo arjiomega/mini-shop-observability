@@ -25,6 +25,6 @@ WORKDIR /app
 # Copy compiled binary
 COPY --from=builder /app/gateway/gateway .
 
-EXPOSE 50051
+EXPOSE 8080
 
 CMD ["./gateway"]

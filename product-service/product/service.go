@@ -20,8 +20,8 @@ func NewService(
 		cache:      cache,
 	}
 }
-func (s *Service) Create(input ProductCreate) (Product, error) {
-	return s.repository.Create(input)
+func (s *Service) Create(ctx context.Context, input ProductCreate) (Product, error) {
+	return s.repository.Create(ctx, input)
 }
 
 func (s *Service) GetByID(ctx context.Context, id int) (Product, error) {
@@ -39,7 +39,9 @@ func (s *Service) GetByID(ctx context.Context, id int) (Product, error) {
 
 	// POPULATE CACHE
 	if err := s.cache.Set(ctx, product, 5*time.Minute); err != nil {
-		// Don't fail the request just because caching failed.
+		if ctx.Err() != nil {
+			return product, ctx.Err()
+		}
 		log.Printf("failed to cache product %d: %v", id, err)
 	}
 

@@ -28,13 +28,15 @@ func (h *Handler) GetProduct(
 	c *gin.Context,
 	productId int,
 ) {
+	ctx := c.Request.Context()
+
 	product, err := h.client.GetProduct(
-		c.Request.Context(),
+		ctx,
 		int64(productId),
 	)
 	if err != nil {
 		h.logger.Error(
-			c.Request.Context(),
+			ctx,
 			"failed to get product",
 			slog.Int("product_id", productId),
 			slog.Any("error", err),
