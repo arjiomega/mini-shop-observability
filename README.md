@@ -12,6 +12,16 @@ The product-service owns the product domain and communicates with PostgreSQL and
 
 Consul provides service discovery so that gateways don't need to know the individual product-service container addresses.
 
+## Services
+
+![Services](./Mini-Shop-Services.png)
+
+
+<br>
+
+![Prometheus-Grafana](./Prometheus-Grafana.png)
+
+
 ## Running the Project
 
 Build and start the stack with six product-service replicas:
